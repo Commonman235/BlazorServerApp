@@ -1,0 +1,183 @@
+﻿@page "/"
+@page "/employee" 
+@using System.Text
+@using Newtonsoft.Json;
+@using BlazorServerApp.Model;
+@inject IConfiguration Configuration
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.6.0/umd/popper.min.js" integrity="sha512-BmM0/BQlqh02wuK5Gz9yrbe7VyIVwOzD1o40yi1IsTjriX/NGF37NyXHfmFzIlMmoSIBXgqDiG1VNU6kB5dBbA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<EditForm style="padding-bottom:25px" Model="@employeeData" OnSubmit="AddNewEmployee" FormName="myForm">
+    <DataAnnotationsValidator/> 
+    <ValidationSummary/>
+
+    <div class="row">
+        <div class="col-sm">
+            <label style="padding-bottom:10px">Enter Employee Name </label>
+            <div class="col-lg-3" style="padding-bottom:10px">
+                <input @bind="@employeeData.Name" />&nbsp;
+                <ValidationMessage For="@(() => employeeData.Name)" />
+            </div>
+
+        </div>
+        <div class="col-sm">
+            <label style="padding-bottom:10px">Enter Salary </label>
+            <div class="col-lg-3" style="padding-bottom:10px">
+                <input @bind="@employeeData.Salary" />&nbsp;
+            </div>
+
+        </div>
+
+        <div class="col-sm">
+            <label style="padding-bottom:10px">Enter Department </label>
+            <div class="col-lg-3" style="padding-bottom:10px">
+                <input @bind="@employeeData.Department" />&nbsp;
+            </div>
+
+        </div>
+        <div class="col-sm" style="margin-top:30px">
+            <button class="btn btn-success "  type="submit">Add Employee</button>
+        </div>
+    </div>
+    
+</EditForm>
+
+@if (employees == null)
+{
+    <p> No Data Found..!  </p>
+    <p> Add New Employee Details!  </p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>EmployeeID</th>
+                <th>Name</th>
+                <th>Department</th>
+                <th>Salary</th>
+                <th>Update</th>
+                <th>Delete</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (EmployeeDetails employee in employees)
+            {
+                <tr>
+                    <td>@employee.id </td>
+                    <td><input type="text" @bind-value="@employee.name" /></td>
+                    <td><input type="text" @bind-value="@employee.department" /></td>
+                    <td><input type="number" @bind-value="@employee.salary" /></td>
+                    <td><button class="btn btn-primary" @onclick="() => UpdateEmployee(employee)">Update</button></td>
+                    <td><button class="btn btn-danger"  @onclick="() => DeleteEmployee(employee)">Delete</button></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+ 
+@code {
+
+    public EmployeeData employeeData = new EmployeeData();
+    protected List<EmployeeDetails> employees = new List<EmployeeDetails>();
+     
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        await GetEmployeeDetails();
+    }
+
+    protected async Task GetEmployeeDetails()
+    {
+        var BaseUrl = Configuration.GetConnectionString("BaseUrl").ToString();
+        var ApiUrl = Configuration.GetConnectionString("GetUrl").ToString();
+
+        try
+        {
+            HttpClient client = new HttpClient();
+            HttpResponseMessage response = await client.GetAsync(BaseUrl+ApiUrl);
+            client.Dispose();
+            if (response.IsSuccessStatusCode)
+            {
+                var respstream = await response.Content.ReadAsStringAsync();
+                employees = System.Text.Json.JsonSerializer.Deserialize<List<EmployeeDetails>>(respstream);
+            }
+            else { employees = null; }
+        }
+        catch (Exception e) { throw e; }
+
+    }
+
+
+    protected async Task AddNewEmployee()
+    {
+        var BaseUrl = Configuration.GetConnectionString("BaseUrl").ToString();
+        var ApiUrl = Configuration.GetConnectionString("AddUrl").ToString();
+        try
+        {
+            string jsonString = JsonConvert.SerializeObject(employeeData, Formatting.Indented);
+            var apicontent = new StringContent(jsonString, UnicodeEncoding.UTF8, "application/json");
+
+            HttpClient client = new HttpClient();
+            HttpResponseMessage response = await client.PostAsync(BaseUrl + ApiUrl, apicontent);
+            client.Dispose();
+            if (response.IsSuccessStatusCode)
+            {
+                var respstream = await response.Content.ReadAsStringAsync();
+                await this.GetEmployeeDetails();
+                employeeData.Name = string.Empty;
+                employeeData.Id = string.Empty;
+                employeeData.Salary = string.Empty;
+                employeeData.Department = string.Empty;
+            }
+            else { }
+
+        }
+        catch (Exception E) { throw E; }
+
+    }
+
+
+    protected async Task UpdateEmployee(EmployeeDetails em)
+    {
+        var BaseUrl = Configuration.GetConnectionString("BaseUrl").ToString();
+        var ApiUrl = Configuration.GetConnectionString("UpdateUrl").ToString();
+
+        try
+        {
+            string jsonString = JsonConvert.SerializeObject(em, Formatting.Indented);
+            var apicontent = new StringContent(jsonString, UnicodeEncoding.UTF8, "application/json");
+
+            HttpClient client = new HttpClient();
+            HttpResponseMessage response = await client.PutAsync(BaseUrl + ApiUrl, apicontent);
+            client.Dispose();
+            if (response.IsSuccessStatusCode)
+            {
+                var respstream = await response.Content.ReadAsStringAsync();
+                await this.GetEmployeeDetails();
+            }
+            else { }
+        }
+        catch (Exception e) { throw e; }
+    }
+
+
+    protected async Task DeleteEmployee(EmployeeDetails em)
+    {
+        var BaseUrl = Configuration.GetConnectionString("BaseUrl").ToString();
+        var ApiUrl = Configuration.GetConnectionString("DeleteUrl").ToString();
+        try
+        {
+            HttpClient client = new HttpClient();
+            HttpResponseMessage response = await client.DeleteAsync(BaseUrl+ApiUrl+"?EmployeeId="+em.id);
+            client.Dispose();
+            if (response.IsSuccessStatusCode)
+            {
+                var respstream = await response.Content.ReadAsStringAsync();
+                await this.GetEmployeeDetails();
+            }
+            else { }
+        }
+        catch (Exception e) { throw e; }
+    }
+}
